@@ -15,16 +15,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-var express = require('express'),
-    fs = require('fs'),
-    https = require('https'),
-    pg = require('pg'),
-    socketio = require('socket.io'),
-    config = require('./config.js');
+var express = require('express');
+var fs = require('fs');
+var https = require('https');
+var pg = require('pg');
+var socketio = require('socket.io');
+var config = require('./config.js');
+var db = require('./db.js');
+var log = require('./log.js');
 
 var app = express();
 app.disable('x-powered-by');
-app.get('/', function(req, res) {
+
+app.get('/', function(req, res)
+{
     res.send("");
 });
 
@@ -33,171 +37,90 @@ var server = https.createServer({
     cert: fs.readFileSync(config["sslCertFile"]),
 }, app);
 
-server.listen(config["serverPort"], function() {
+server.listen(config["serverPort"], function()
+{
     console.log("Listening on *:%d", config["serverPort"]);
 });
 
 var nUsers = 0;
 
 var io = socketio(server);
-io.set('heartbeat interval', 300000);
-io.set('heartbeat timeout', 60000);
-io.on('connection', onConnect);
+io.set('heartbeat interval', config['heartbeatInterval']);
+io.set('heartbeat timeout', config['heartbeatTimeout']);
 
-function onConnect(socket)
+io.on('connection', function(socket)
 {
     nUsers++;
     printUserCount();
     socket.groupKey = "";
     socket.clientId = "";
 
-    socket.on('auth', onAuth);
-    socket.on('post', onPost);
-    socket.on('fetch', onFetch);
-    socket.on('disconnect', onDisconnect);
-
-    function onDisconnect()
+    socket.on('disconnect', function()
     {
         nUsers--;
         printUserCount();
     }
 
-    function onAuth(data)
+    socket.on('auth', function(data)
     {
-        logInbound("----", "auth", data);
+        log.inbound("----", "auth", data);
 
         params = JSON.parse(data);
         socket.groupKey = params['groupKey'];
         socket.clientId = params['clientId'];
         socket.join(socket.groupKey);
 
-        logOutbound(socket.clientId, "authOK", "");
+        log.outbound(socket.clientId, "authOK", "");
         io.to(socket.id).emit('authOK');
     }
 
-    function onPost(data)
+    socket.on('post', function(data)
     {
-        logInbound(socket.clientId, "post", data);
+        log.outbound(socket.clientId, "post", data);
 
         var timestamp = getCurrentTime();
-        appendCommand(timestamp, socket.groupKey, data);
-        broadcastCommand(timestamp, socket.groupKey, data);
+        db.put(timestamp, socket.groupKey, data);
+        broadcast(timestamp, socket.groupKey, data);
     }
 
-    function onFetch(data)
+    socket.on('fetch', function(data)
     {
-        logInbound(socket.clientId, "fetch", data);
+        log.inbound(socket.clientId, "fetch", data);
 
         data = JSON.parse(data);
-        fetch(socket.groupKey, data['since'], function(contents, timestamps)
+        var key = socket.groupKey;
+        var since = data['since'];
+
+        db.get(key, since, function(contents, timestamps)
         {
             for(var i=0; i < contents.length; i++)
             {
-                broadcastCommand(timestamps[i], socket.id, contents[i]);
+                broadcast(timestamps[i], socket.id, contents[i]);
             };
 
             okData = JSON.stringify({"timestamp": getCurrentTime()});
-            logOutbound(socket.clientId, "fetchOK", okData);
+            log.outbound(socket.clientId, "fetchOK", okData);
             io.to(socket.id).emit('fetchOK', okData);
         });
     }
-}
 
-function broadcastCommand(timestamp, group_key, content)
-{
-    content = JSON.parse(content);
-    content.timestamp = timestamp;
-    content = JSON.stringify(content);
-
-    logOutbound(group_key, "execute", content);
-    io.to(group_key).emit("execute", content);
-}
-
-function logInbound(key, action, data)
-{
-    console.log("%s <-- %s %s", key.substring(0, 4),
-            action, data);
-}
-
-function logOutbound(key, action, data)
-{
-    console.log("%s --> %s %s", key.substring(0, 4),
-            action, data);
-}
-
-function printUserCount()
-{
-    console.log('Users: %d', nUsers);
-}
-
-function appendCommand(timestamp, key, data)
-{
-    pg.connect(config["databaseURL"], function(err, client, done)
+    function broadcast(timestamp, group_key, content)
     {
-        if(err)
-        {
-            console.log(err);
-            done(client);
-            return;
-        }
+        content = JSON.parse(content);
+        content.timestamp = timestamp;
+        content = JSON.stringify(content);
 
-        var query = 'insert into commands(timestamp, group_key, content) ' +
-            'values (to_timestamp($1), $2, $3)';
+        log.outbound(group_key, "execute", content);
+        io.to(group_key).emit("execute", content);
+    }
 
-        client.query(query, [timestamp, key, data], function(err, result)
-        {
-            if(err)
-            {
-                console.log(err);
-                done(client);
-                return;
-            }
-
-            done(client);
-        });
-    });
-}
-
-function fetch(key, since, callback)
-{
-    pg.connect(config["databaseURL"], function(err, client, done)
+    function printUserCount()
     {
-        if(err)
-        {
-            console.log(err);
-            done(client);
-            return;
-        }
+        console.log('Users: %d', nUsers);
+    }
 
-        var query = 'select timestamp, content from commands ' +
-            'where timestamp > to_timestamp($1) and group_key = $2';
-
-        client.query(query, [since, key], function(err, result)
-        {
-            if(err)
-            {
-                console.log(err);
-                done(client);
-                return;
-            }
-
-            done(client);
-
-            var timestamps = result.rows.map(function(row) {
-                return row.timestamp.getTime() / 1000;
-            });
-
-            var contents = result.rows.map(function(row) {
-                return JSON.stringify(row.content);
-            });
-
-
-            callback(contents, timestamps);
-        });
-    });
-}
-
-function getCurrentTime()
-{
-    return Math.round(new Date().getTime() / 1000);
+    function getCurrentTime()
+    {
+        return Math.round(new Date().getTime() / 1000);
+    }
 }

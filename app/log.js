@@ -15,12 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-module.exports =
+exports.inbound = function(key, action, data)
 {
-    'serverPort': 4000,
-    'databaseURL': 'postgres://habits@localhost/habits',
-    'sslKeyFile': '/home/habits/ssl/sync.loophabits.org.key',
-    'sslCertFile': '/home/habits/ssl/sync.loophabits.org.crt',
-    'heartbeatInterval': 300000,
-    'heartbeatTimeout': 60000,
-};
+    console.log("%s <-- %s %s", key.substring(0, 4), action, data);
+}
+
+exports.outbound = function(key, action, data)
+{
+    console.log("%s --> %s %s", key.substring(0, 4), action, data);
+}
+
