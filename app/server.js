@@ -1,25 +1,40 @@
-var express = require('express');
-var fs = require('fs');
-var https = require('https');
-var pg = require('pg');
-var socketio = require('socket.io');
+/* Sync server for Loop Habit Tracker
+ * Copyright (C) 2016 Álinson Santos Xavier <isoron@gmail.com>
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+var express = require('express'),
+    fs = require('fs'),
+    https = require('https'),
+    pg = require('pg'),
+    socketio = require('socket.io'),
+    config = require('./config.js');
 
 var app = express();
-var serverPort = 4000;
-var server = https.createServer({
-    key: fs.readFileSync('./ssl.key'),
-    cert: fs.readFileSync('./ssl.crt'),
-}, app);
-
-var dbURL = "postgres://habits@localhost/habits";
-
 app.disable('x-powered-by');
 app.get('/', function(req, res) {
     res.send("");
 });
 
-server.listen(serverPort, function() {
-    console.log("Listening on *:%d", serverPort);
+var server = https.createServer({
+    key: fs.readFileSync(config["sslKeyFile"]),
+    cert: fs.readFileSync(config["sslCertFile"]),
+}, app);
+
+server.listen(config["serverPort"], function() {
+    console.log("Listening on *:%d", config["serverPort"]);
 });
 
 var nUsers = 0;
@@ -117,7 +132,7 @@ function printUserCount()
 
 function appendCommand(timestamp, key, data)
 {
-    pg.connect(dbURL, function(err, client, done)
+    pg.connect(config["databaseURL"], function(err, client, done)
     {
         if(err)
         {
@@ -145,7 +160,7 @@ function appendCommand(timestamp, key, data)
 
 function fetch(key, since, callback)
 {
-    pg.connect(dbURL, function(err, client, done)
+    pg.connect(config["databaseURL"], function(err, client, done)
     {
         if(err)
         {
