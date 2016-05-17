@@ -20,6 +20,7 @@ var fs = require('fs');
 var https = require('https');
 var pg = require('pg');
 var socketio = require('socket.io');
+
 var config = require('./config.js');
 var db = require('./db.js');
 var log = require('./log.js');
@@ -59,7 +60,7 @@ io.on('connection', function(socket)
     {
         nUsers--;
         printUserCount();
-    }
+    });
 
     socket.on('auth', function(data)
     {
@@ -72,7 +73,7 @@ io.on('connection', function(socket)
 
         log.outbound(socket.clientId, "authOK", "");
         io.to(socket.id).emit('authOK');
-    }
+    });
 
     socket.on('post', function(data)
     {
@@ -81,7 +82,7 @@ io.on('connection', function(socket)
         var timestamp = getCurrentTime();
         db.put(timestamp, socket.groupKey, data);
         broadcast(timestamp, socket.groupKey, data);
-    }
+    });
 
     socket.on('fetch', function(data)
     {
@@ -102,7 +103,7 @@ io.on('connection', function(socket)
             log.outbound(socket.clientId, "fetchOK", okData);
             io.to(socket.id).emit('fetchOK', okData);
         });
-    }
+    });
 
     function broadcast(timestamp, group_key, content)
     {
@@ -123,4 +124,4 @@ io.on('connection', function(socket)
     {
         return Math.round(new Date().getTime() / 1000);
     }
-}
+});
