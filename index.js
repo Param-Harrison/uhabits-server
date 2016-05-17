@@ -1,24 +1,32 @@
-var app = require('express')();
-var http = require('http').Server(app);
-var io = require('socket.io')(http);
+var express = require('express');
+var fs = require('fs');
+var https = require('https');
 var pg = require('pg');
+var socketio = require('socket.io');
 
-var httpPort = 4000;
+var app = express();
+var serverPort = 4000;
+var server = https.createServer({
+    key: fs.readFileSync('./ssl.key'),
+    cert: fs.readFileSync('./ssl.crt'),
+}, app);
+
 var dbURL = "postgres://habits@localhost/habits";
-
-io.set('heartbeat interval', 300000);
-io.set('heartbeat timeout', 60000);
 
 app.disable('x-powered-by');
 app.get('/', function(req, res) {
     res.send("");
 });
 
-http.listen(httpPort, function() {
-    console.log("Listening on *:%d", httpPort);
+server.listen(serverPort, function() {
+    console.log("Listening on *:%d", serverPort);
 });
 
 var nUsers = 0;
+
+var io = socketio(server);
+io.set('heartbeat interval', 300000);
+io.set('heartbeat timeout', 60000);
 io.on('connection', onConnect);
 
 function onConnect(socket)
@@ -28,10 +36,10 @@ function onConnect(socket)
     socket.groupKey = "";
     socket.clientId = "";
 
-    socket.on('auth', data => onAuth(data));
-    socket.on('post', data => onPost(data));
-    socket.on('fetch', data => onFetch(data));
-    socket.on('disconnect', () => onDisconnect());
+    socket.on('auth', onAuth);
+    socket.on('post', onPost);
+    socket.on('fetch', onFetch);
+    socket.on('disconnect', onDisconnect);
 
     function onDisconnect()
     {
@@ -56,7 +64,7 @@ function onConnect(socket)
     {
         logInbound(socket.clientId, "post", data);
 
-        var timestamp = Math.round(new Date().getTime() / 1000);
+        var timestamp = getCurrentTime();
         appendCommand(timestamp, socket.groupKey, data);
         broadcastCommand(timestamp, socket.groupKey, data);
     }
@@ -73,8 +81,9 @@ function onConnect(socket)
                 broadcastCommand(timestamps[i], socket.id, contents[i]);
             };
 
-            logOutbound(socket.clientId, "fetchOK", "");
-            io.to(socket.id).emit('fetchOK');
+            okData = JSON.stringify({"timestamp": getCurrentTime()});
+            logOutbound(socket.clientId, "fetchOK", okData);
+            io.to(socket.id).emit('fetchOK', okData);
         });
     }
 }
@@ -171,4 +180,9 @@ function fetch(key, since, callback)
             callback(contents, timestamps);
         });
     });
+}
+
+function getCurrentTime()
+{
+    return Math.round(new Date().getTime() / 1000);
 }
