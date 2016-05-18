@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Sync server for Loop Habit Tracker",
   "dependencies": {
+    "ajv": "^4.0.5",
     "chai": "^3.5.0",
     "express": "^4.10.2",
     "mocha": "^2.4.5",

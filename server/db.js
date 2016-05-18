@@ -17,70 +17,66 @@
 
 var pg = require('pg');
 var config = require('./config.js');
+var databaseURL = config['databaseURL'];
 
-exports.put = function(timestamp, key, data)
+function executeQuery(query, params)
 {
-    pg.connect(config["databaseURL"], function(err, client, done)
+    executeQuery(query, params, null);
+}
+
+function executeQuery(query, params, callback)
+{
+    pg.connect(databaseURL, function(err, client, done)
     {
         if(err)
         {
             console.log(err);
+            if(callback) callback(err, null);
             done(client);
             return;
         }
 
-        var query = 'insert into commands(timestamp, group_key, content) ' +
-            'values (to_timestamp($1), $2, $3)';
-
-        client.query(query, [timestamp, key, data], function(err, result)
+        client.query(query, params, function(err, result)
         {
+            done(client);
+
             if(err)
             {
                 console.log(err);
-                done(client);
+                if(callback) callback(err, null);
                 return;
             }
 
-            done(client);
+            if(callback) callback(null, result);
         });
     });
 }
 
+exports.put = function(timestamp, key, data)
+{
+    var query = 'insert into commands(timestamp, group_key, content) ' +
+        'values (to_timestamp($1), $2, $3)';
+
+    executeQuery(query, [timestamp, key, data]);
+}
+
 exports.get = function(key, since, callback)
 {
-    pg.connect(config["databaseURL"], function(err, client, done)
+    var query = 'select timestamp, content from commands ' +
+        'where timestamp > to_timestamp($1) and group_key = $2';
+
+    executeQuery(query, [since, key], function(err, result)
     {
-        if(err)
-        {
-            console.log(err);
-            done(client);
-            return;
-        }
+        if(err) return;
 
-        var query = 'select timestamp, content from commands ' +
-            'where timestamp > to_timestamp($1) and group_key = $2';
+        var timestamps = result.rows.map(
+            row => row.timestamp.getTime() / 1000
+        );
 
-        client.query(query, [since, key], function(err, result)
-        {
-            if(err)
-            {
-                console.log(err);
-                done(client);
-                return;
-            }
+        var contents = result.rows.map(
+            row => JSON.stringify(row.content)
+        );
 
-            done(client);
-
-            var timestamps = result.rows.map(function(row) {
-                return row.timestamp.getTime() / 1000;
-            });
-
-            var contents = result.rows.map(function(row) {
-                return JSON.stringify(row.content);
-            });
-
-
-            callback(contents, timestamps);
-        });
+        callback(contents, timestamps);
     });
 }

@@ -15,27 +15,49 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-var config =
+exports.auth =
 {
-    'production': {
-        'serverHostname': '::',
-        'serverPort': 4000,
-        'databaseURL': 'postgres://habits@localhost/habits_prod',
-        'sslKeyFile': '/home/habits/ssl/sync.loophabits.org.key',
-        'sslCertFile': '/home/habits/ssl/sync.loophabits.org.crt',
-        'heartbeatInterval': 300000,
-        'heartbeatTimeout': 60000,
+    'type': 'object',
+    'properties': {
+        'groupKey': {
+            'type': 'string'
+        },
+        'clientId': {
+            'type': 'string'
+        },
+        'version': {
+            'type': 'string'
+        }
     },
+    'required': ['groupKey', 'clientId']
+}
 
-    'test': {
-        'serverHostname': '::1',
-        'serverPort': 4001,
-        'databaseURL': 'postgres://habits@localhost/habits_test',
-        'sslKeyFile': '/home/habits/ssl/sync.loophabits.org.key',
-        'sslCertFile': '/home/habits/ssl/sync.loophabits.org.crt',
-        'heartbeatInterval': 300000,
-        'heartbeatTimeout': 60000,
-    }
-};
+exports.post =
+{
+    'type': 'object',
+    'properties': {
+        'id': {
+            'type': 'string',
+        },
+        'data': {
+            'type': 'object',
+            'maxProperties': 100,
+        },
+        'command': {
+            'type': 'string',
+            'maxLength': 100,
+        }
+    },
+    'required': ['id', 'data', 'command']
+}
 
-module.exports = config[process.env.LOOP_ENV || 'production'];
+exports.fetch =
+{
+    'type': 'object',
+    'properties': {
+        'since': {
+            'type': 'number'
+        }
+    },
+    'required': ['since']
+}
