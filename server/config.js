@@ -20,21 +20,29 @@ var config =
     'production': {
         'serverHostname': '::',
         'serverPort': 4000,
-        'databaseURL': 'postgres://habits@localhost/habits_prod',
-        'sslKeyFile': '/home/habits/ssl/sync.loophabits.org.key',
-        'sslCertFile': '/home/habits/ssl/sync.loophabits.org.crt',
+        'databaseURL': 'postgres://localhost/habits_prod',
+        'sslKeyFile': '/home/isoron/SSL/sync.loophabits.org.key',
+        'sslCertFile': '/home/isoron/SSL/sync.loophabits.org.crt',
         'heartbeatInterval': 300000,
         'heartbeatTimeout': 60000,
+        'authTimeout': 5000,
+        'rateLimitWindow': 600000,
+        'rateLimitQuota': 600,
+        "maxConnectionsPerKey": 10
     },
 
     'test': {
         'serverHostname': '::1',
         'serverPort': 4001,
-        'databaseURL': 'postgres://habits@localhost/habits_test',
-        'sslKeyFile': '/home/habits/ssl/sync.loophabits.org.key',
-        'sslCertFile': '/home/habits/ssl/sync.loophabits.org.crt',
+        'databaseURL': 'postgres://localhost/habits_test',
+        'sslKeyFile': '/home/isoron/SSL/sync.loophabits.org.key',
+        'sslCertFile': '/home/isoron/SSL/sync.loophabits.org.crt',
         'heartbeatInterval': 300000,
         'heartbeatTimeout': 60000,
+        'authTimeout': 100,
+        'rateLimitWindow': 60000,
+        'rateLimitQuota': 10,
+        "maxConnectionsPerKey": 10
     }
 };
 

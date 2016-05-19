@@ -69,6 +69,71 @@ describe('Authentication', function()
             done();
         });
     });
+
+    it('should disconnect idle non-authenticated clients', function(done)
+    {
+       var socket = actions.connect();
+        socket.on('disconnect', function()
+        {
+            done();
+        });
+    });
+
+    it('should disconnect fast clients', function(done)
+    {
+        var keepGoing = true;
+        var socket = actions.connectAndRegister();
+
+        function flood()
+        {
+            socket.emit('fetch', { 'since': 0 });
+            if(keepGoing) setTimeout(flood, 5);
+        }
+
+        socket.on('authOK', function ()
+        {
+            flood();
+        });
+
+        socket.on('err', function(data)
+        {
+            data['code'].should.equal(429);
+            keepGoing = false;
+            socket.disconnect();
+            done();
+        });
+    });
+
+    it('should refuse too many clients per key', function(done)
+    {
+        var keepGoing = true;
+        var socket1 = actions.connectAndRegister();
+        var sockets = [socket1];
+
+        socket1.on('authOK', function()
+        {
+            flood();
+        });
+
+        function flood()
+        {
+            if(!keepGoing) return;
+            var socketx = actions.connectAndAuth(socket1.groupKey);
+            sockets.push(socketx);
+
+            socketx.on('err', function(data)
+            {
+                for(var i = 0; i < sockets.length; i++)
+                    sockets[i].disconnect();
+
+                data['code'].should.equal(429);
+                keepGoing = false;
+                done();
+            });
+
+            setTimeout(flood, 10);
+        }
+    });
 });
 
 describe('Live broadcast', function()
