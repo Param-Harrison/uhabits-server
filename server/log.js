@@ -17,11 +17,17 @@
 
 exports.inbound = function(key, action, data)
 {
-    console.log("%s <-- %s %s", key.substring(0, 4), action, JSON.stringify(data));
-}
+    if(!data) data = "";
+    console.log("<-- %s %s %s", key.substring(0, 4), action, JSON.stringify(data));
+};
 
 exports.outbound = function(key, action, data)
 {
-    console.log("%s --> %s %s", key.substring(0, 4), action, JSON.stringify(data));
-}
+    if(!data) data = "";
+    console.log("--> %s %s %s", key.substring(0, 4), action, JSON.stringify(data));
+};
 
+exports.event = function(key, msg)
+{
+    console.log("*** %s %s", key.substring(0, 4), msg);
+};

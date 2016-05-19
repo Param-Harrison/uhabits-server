@@ -30,26 +30,26 @@ exports.auth =
         }
     },
     'required': ['groupKey', 'clientId']
-}
+};
 
 exports.post =
 {
     'type': 'object',
     'properties': {
         'id': {
-            'type': 'string',
+            'type': 'string'
         },
         'data': {
             'type': 'object',
-            'maxProperties': 100,
+            'maxProperties': 100
         },
         'command': {
             'type': 'string',
-            'maxLength': 100,
+            'maxLength': 100
         }
     },
     'required': ['id', 'data', 'command']
-}
+};
 
 exports.fetch =
 {
@@ -60,4 +60,4 @@ exports.fetch =
         }
     },
     'required': ['since']
-}
+};

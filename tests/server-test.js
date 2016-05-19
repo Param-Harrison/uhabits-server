@@ -16,61 +16,57 @@
  */
 
 process.env.LOOP_ENV = 'test';
-var https = require('https');
-var config = require('../server/config.js');
-https.globalAgent.options.rejectUnauthorized = false;
-
+var db = require('../server/db.js');
+var actions = require('./actions.js');
 var should = require('chai').should();
-var io = require('socket.io-client');
-var serverURL = 'https://[::1]:' + config['serverPort'];
 
-var allEvents = ['connect', 'authOK', 'err', 'execute', 'fetchOK'];
-
-function createClient(callbacks)
+var event =
 {
-    var socket = io.connect(serverURL, { secure: true, transports: ['websocket'],
-        agent: https.globalAgent });
+    'id': '123',
+    'command': 'ToggleRepetition',
+    'data': { 'timestamp': 1000000}
+};
 
-    allEvents.forEach(function(key) {
-        if(callbacks[key]) socket.on(key, data => callbacks[key](socket, data));
-    });
+beforeEach(function() {
+    db.purge();
+});
 
-    if(!callbacks['err'])
-    {
-        socket.on('err', function(data) {
-            throw data;
-        });
-    }
-
-    return socket;
-}
-
-describe('Server', function()
+describe('Authentication', function()
 {
-    it('should accept with valid data', function(done)
+    it('should allow registration and auth', function(done)
     {
-        createClient({
-            'connect': function(socket, data) {
-                socket.emit('auth', {'groupKey':'123', 'clientId':'123'});
-            },
-            'authOK': function(socket, data) {
-                socket.disconnect();
-                done();
-            }
+        var socket = actions.connectAndRegister();
+        socket.on('authOK', function(data)
+        {
+            socket.disconnect();
+            done();
         });
     });
 
-    it('should reject with invalid data', function(done)
+    it('should reject with bogus auth', function(done)
     {
-        createClient({
-            'connect': function(socket, data) {
-                socket.emit('auth', '<h1>HELLO WORLD</h1>');
-            },
-            'err': function(socket, data) {
-                data['code'].should.equal(400);
-                socket.disconnect();
-                done();
-            }
+        var socket = actions.connect();
+        socket.on('connect', function(data)
+        {
+            socket.emit('auth', '<h1>HELLO WORLD</h1>');
+        });
+
+        socket.on('err', function(data)
+        {
+            data['code'].should.equal(400);
+            socket.disconnect();
+            done();
+        });
+    });
+
+    it('should reject with invalid key', function(done)
+    {
+        var socket = actions.connectAndAuth('123456789bogus');
+        socket.on('err', function(data)
+        {
+            data['code'].should.equal(401);
+            socket.disconnect();
+            done();
         });
     });
 });
@@ -79,69 +75,91 @@ describe('Live broadcast', function()
 {
     it('should reach other clients in the group', function(done)
     {
-        var groupKey = '0123456789';
-
-        createClient({
-            'connect': function(socket, data) {
-                socket.emit('auth', {'groupKey': groupKey, 'clientId': '0'});
-            },
-            'authOK': function(socket, data) {
-                createAnotherClient();
-            },
-            'execute': function(socket, data) {
-                data['command'].should.equal('ToggleRepetition');
-                socket.disconnect();
-                done();
-            }
+        var socket1 = actions.connectAndRegister();
+        socket1.on('authOK', function(data)
+        {
+            connectAnother();
         });
 
-        function createAnotherClient()
+        socket1.on('execute', function(data)
         {
-            createClient({
-                'connect': function(socket, data) {
-                    socket.emit('auth', {'groupKey': groupKey, 'clientId': '1'});
-                },
-                'authOK': function(socket, data) {
-                    socket.emit('post', {'id': 'qwe123', 'command': 'ToggleRepetition', 'data': {
-                        'timestamp': 1000000}});
-                    socket.disconnect();
-                }
+            data.command.should.equal(event.command);
+            data.data.timestamp.should.equal(event.data.timestamp);
+            socket1.disconnect();
+            done();
+        });
+
+        function connectAnother()
+        {
+            var socket2 = actions.connectAndAuth(socket1.groupKey);
+            socket2.on('authOK', function(data)
+            {
+                socket2.emit('post', event);
+                socket2.disconnect();
             });
         }
     });
 
     it('should not reach clients outside of the group', function(done)
     {
-        var groupKey1 = '0123456789';
-        var groupKey2 = '9876543210';
+        var socket1 = actions.connectAndRegister();
+        socket1.on('authOK', function(data)
+        {
+            createAnotherClient();
+            setTimeout(function() {
+                socket1.disconnect();
+                done();
+            }, 250); // wait to receive message
+        });
 
-        createClient({
-            'connect': function(socket, data) {
-                socket.emit('auth', {'groupKey': groupKey1, 'clientId': '0'});
-            },
-            'authOK': function(socket, data) {
-                createAnotherClient();
-            },
-            'execute': function(socket, data) {
-                console.log(data);
-                throw 'Should not receive execute event';
-            },
+        socket1.on('execute', function(data)
+        {
+            throw 'Should not receive execute event';
         });
 
         function createAnotherClient()
         {
-            createClient({
-                'connect': function(socket, data) {
-                    socket.emit('auth', {'groupKey': groupKey2, 'clientId': '1'});
-                },
-                'authOK': function(socket, data) {
-                    socket.emit('post', {'id': 'qwe123', 'command': 'ToggleRepetition', 'data': {
-                        'timestamp': 1000000}});
-                    setTimeout(function() {
-                        socket.disconnect();
-                        done();
-                    }, 250);
-                }
+            var socket2 = actions.connectAndRegister();
+            socket2.on('authOK', function(data)
+            {
+                socket2.emit('post', event);
+                socket2.disconnect();
+            });
+        }
+    });
+});
+
+describe('Delayed broadcast', function()
+{
+    it('should reach other client as they become online', function(done)
+    {
+        var since = null;
+        var socket1 = actions.connectAndRegister();
+        socket1.on('authOK', function()
+        {
+            socket1.emit('post', event);
+        });
+
+        socket1.on('execute', function(data)
+        {
+            since = data['timestamp'];
+            socket1.disconnect();
+            createAnotherClient();
+        });
+
+        function createAnotherClient()
+        {
+            var socket2 = actions.connectAndAuth(socket1.groupKey);
+            socket2.on('authOK', function ()
+            {
+                socket2.emit('fetch', {'since': since});
+            });
+
+            socket2.on('execute', function(data)
+            {
+                data.command.should.equal(event.command);
+                socket2.disconnect();
+                done();
             });
         }
     });

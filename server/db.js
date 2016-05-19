@@ -19,11 +19,6 @@ var pg = require('pg');
 var config = require('./config.js');
 var databaseURL = config['databaseURL'];
 
-function executeQuery(query, params)
-{
-    executeQuery(query, params, null);
-}
-
 function executeQuery(query, params, callback)
 {
     pg.connect(databaseURL, function(err, client, done)
@@ -58,25 +53,54 @@ exports.put = function(timestamp, key, data)
         'values (to_timestamp($1), $2, $3)';
 
     executeQuery(query, [timestamp, key, data]);
-}
+};
 
 exports.get = function(key, since, callback)
 {
     var query = 'select timestamp, content from commands ' +
-        'where timestamp > to_timestamp($1) and group_key = $2';
+        'where timestamp >= to_timestamp($1) and group_key = $2';
 
     executeQuery(query, [since, key], function(err, result)
     {
-        if(err) return;
+        if(err) return callback(err, null);
 
         var timestamps = result.rows.map(
             row => row.timestamp.getTime() / 1000
         );
 
         var contents = result.rows.map(
-            row => JSON.stringify(row.content)
+            row => row.content
         );
 
-        callback(contents, timestamps);
+        callback(null, { 'contents': contents, 'timestamps': timestamps });
     });
-}
+};
+
+exports.register = function(groupKey, callback)
+{
+    var query = 'insert into group_keys(value) values ($1)';
+    executeQuery(query, [groupKey], function(err, result)
+    {
+        if(err) return callback(err, null);
+        callback(null, true);
+    });
+};
+
+exports.auth = function(groupKey, callback)
+{
+    var query = 'select count(*)::int from group_keys where value = $1';
+    executeQuery(query, [groupKey], function(err, result)
+    {
+        if(err) return callback(err, null);
+        callback(null, result.rows[0].count > 0);
+    });
+};
+
+exports.purge = function()
+{
+    if(process.env.LOOP_ENV !== 'test')
+        throw 'Purge is only available on test environment';
+
+    executeQuery('delete from group_keys', []);
+    executeQuery('delete from commands', []);
+};
