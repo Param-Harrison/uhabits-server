@@ -15,19 +15,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+var colors = require('colors');
+
 exports.inbound = function(key, action, data)
 {
     if(!data) data = "";
-    console.log("<-- %s %s %s", key.substring(0, 4), action, JSON.stringify(data));
+    console.log(colors.blue("<-- %s %s %s"), key.substring(0, 8), action, JSON.stringify(data));
 };
 
 exports.outbound = function(key, action, data)
 {
     if(!data) data = "";
-    console.log("--> %s %s %s", key.substring(0, 4), action, JSON.stringify(data));
+    console.log("--> %s %s %s", key.substring(0, 8), action, JSON.stringify(data));
 };
 
 exports.event = function(key, msg)
 {
-    console.log("*** %s %s", key.substring(0, 4), msg);
+    console.log(colors.grey("*** %s %s"), key.substring(0, 8), msg);
 };
