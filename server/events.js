@@ -24,8 +24,9 @@ var config = require('./config.js');
 
 var validate = {};
 validate.auth = ajv.compile(schemas.auth);
-validate.post = ajv.compile(schemas.post);
 validate.fetch = ajv.compile(schemas.fetch);
+validate.postEvent = ajv.compile(schemas.postEvent);
+validate.postSnapshot = ajv.compile(schemas.postSnapshot);
 
 const BAD_REQUEST = 400;
 const UNAUTHORIZED = 401;
@@ -58,20 +59,25 @@ function SocketEvents(socket, io)
         });
     };
 
-    this.onPost = function(data)
+    this.onPostEvent = function(data)
     {
-        log.inbound(socket.id, 'post', data);
+        log.inbound(socket.id, 'postEvent', data);
         if(!decreaseQuota()) return;
-        if(!validate.post(data)) return fail(BAD_REQUEST);
+        if(!validate.postEvent(data)) return fail(BAD_REQUEST);
         if(!socket.isAuthenticated) return fail(UNAUTHORIZED);
 
-        var timestamp = getCurrentTime();
+        var timestamp = getCurrentTimestamp();
         data.timestamp = timestamp;
-        db.put(timestamp, socket.groupKey, data);
+        db.events.put(timestamp, socket.groupKey, data);
 
         log.outbound(socket.groupKey, 'execute', data);
         io.to(socket.groupKey).emit('execute', data);
     };
+
+    function getCurrentTimestamp()
+    {
+        return Math.round(new Date().getTime() / 1000);
+    }
 
     this.onFetch = function(data)
     {
@@ -83,18 +89,65 @@ function SocketEvents(socket, io)
         var key = socket.groupKey;
         var since = data['since'];
 
-        db.get(key, since, function(err, result)
+        db.snapshots.get(key, since, function(err, result)
         {
             if(err) return fail(INTERNAL_SERVER_ERROR);
-            for(var i = 0; i < result.contents.length; i++)
+
+            if(result)
             {
-                result.contents[i].timestamp = result.timestamps[i];
-                log.outbound(socket.id, 'execute', result.contents[i]);
-                io.to(socket.id).emit('execute', result.contents[i]);
+                result.content.timestamp = result.timestamp;
+                log.outbound(socket.id, 'replace', result.content);
+                io.to(socket.id).emit('replace', result.content);
             }
 
-            log.outbound(socket.id, 'fetchOK', {'timestamp': getCurrentTime()});
-            io.to(socket.id).emit('fetchOK', {'timestamp': getCurrentTime()});
+            db.events.get(key, since, function(err, result)
+            {
+                if(err) return fail(INTERNAL_SERVER_ERROR);
+                for(var i = 0; i < result.contents.length; i++)
+                {
+                    result.contents[i].timestamp = result.timestamps[i];
+                    log.outbound(socket.id, 'execute', result.contents[i]);
+                    io.to(socket.id).emit('execute', result.contents[i]);
+                }
+
+                var timestamp = getCurrentTimestamp();
+                log.outbound(socket.id, 'fetchOK', {'timestamp': timestamp});
+                io.to(socket.id).emit('fetchOK', {'timestamp': timestamp});
+            });
+        });
+    };
+
+    this.onPostSnapshot = function(data)
+    {
+        log.inbound(socket.id, 'postSnapshot', data);
+        if(!decreaseQuota()) return;
+        if(!validate.postSnapshot(data)) return fail(BAD_REQUEST);
+        if(!socket.isAuthenticated) return fail(UNAUTHORIZED);
+
+        var timestamp = getCurrentTimestamp();
+        data.timestamp = timestamp;
+        db.snapshots.put(timestamp, socket.groupKey, data);
+
+        log.outbound(socket.groupKey, 'replace', data);
+        io.to(socket.groupKey).emit('replace', data);
+    };
+
+    this.onGetSnapshot = function(data)
+    {
+        log.inbound(socket.id, 'getSnapshot', data);
+        if(!decreaseQuota()) return;
+        if(!validate.getGetSnapshot(data)) return fail(BAD_REQUEST);
+        if(!socket.isAuthenticated) return fail(UNAUTHORIZED);
+
+        var key = socket.groupKey;
+
+        db.snapshots.get(key, function(err, result)
+        {
+            if(err) return fail(INTERNAL_SERVER_ERROR);
+            
+            result.content.timestamp = result.timestamp;
+            log.outbound(socket.id, 'replace', result.content);
+            io.to(socket.id).emit('replace', result.content);
         });
     };
 
@@ -121,11 +174,6 @@ function SocketEvents(socket, io)
         socket.isConnected = false;
         log.event(socket.id, 'disconnected');
     };
-
-    function getCurrentTime()
-    {
-        return Math.round(new Date().getTime() / 1000);
-    }
 
     function decreaseQuota()
     {
@@ -199,7 +247,8 @@ function Events(io)
 
         socketEvents.resetQuota();
         socket.on('auth', socketEvents.onAuth);
-        socket.on('post', socketEvents.onPost);
+        socket.on('postEvent', socketEvents.onPostEvent);
+        socket.on('postSnapshot', socketEvents.onPostSnapshot);
         socket.on('fetch', socketEvents.onFetch);
         socket.on('register', socketEvents.onRegister);
         socket.on('disconnect', socketEvents.onDisconnect);

@@ -26,6 +26,7 @@ function executeQuery(query, params, callback)
         if(err)
         {
             console.log(err);
+            console.log(new Error().stack);
             if(callback) callback(err, null);
             done(client);
             return;
@@ -38,6 +39,7 @@ function executeQuery(query, params, callback)
             if(err)
             {
                 console.log(err);
+                console.log(new Error().stack);
                 if(callback) callback(err, null);
                 return;
             }
@@ -47,17 +49,19 @@ function executeQuery(query, params, callback)
     });
 }
 
-exports.put = function(timestamp, key, data)
+exports.events = {};
+
+exports.events.put = function(timestamp, key, data)
 {
-    var query = 'insert into commands(timestamp, group_key, content) ' +
+    var query = 'insert into events(timestamp, group_key, content) ' +
         'values (to_timestamp($1), $2, $3)';
 
     executeQuery(query, [timestamp, key, data]);
 };
 
-exports.get = function(key, since, callback)
+exports.events.get = function(key, since, callback)
 {
-    var query = 'select timestamp, content from commands ' +
+    var query = 'select timestamp, content from events ' +
         'where timestamp >= to_timestamp($1) and group_key = $2';
 
     executeQuery(query, [since, key], function(err, result)
@@ -69,10 +73,41 @@ exports.get = function(key, since, callback)
         );
 
         var contents = result.rows.map(
-            row => row.content
+            row => JSON.parse(row.content)
         );
 
         callback(null, { 'contents': contents, 'timestamps': timestamps });
+    });
+};
+
+exports.snapshots = {};
+
+exports.snapshots.put = function(timestamp, group_key, data)
+{
+    executeQuery('delete from snapshots where group_key = $1', [group_key]);
+
+    executeQuery('insert into snapshots(timestamp, group_key, content) ' +
+        'values (to_timestamp($1), $2, $3)', [timestamp, group_key, data]);
+
+    executeQuery('delete from events where timestamp <= to_timestamp($1) and ' +
+        'group_key = $2', [timestamp, group_key]);
+};
+
+exports.snapshots.get = function(key, since, callback)
+{
+    var query = 'select timestamp, content from snapshots ' +
+        'where group_key = $1 and timestamp >= to_timestamp($2) ' +
+        'order by timestamp desc limit 1';
+
+    executeQuery(query, [key, since], function(err, result)
+    {
+        if(err) return callback(err, null);
+
+        if(result.rows.length > 0)
+            callback(null, { 'content': JSON.parse(result.rows[0].content),
+                'timestamp': result.rows[0].timestamp });
+        else
+            callback(null, null);
     });
 };
 
@@ -102,5 +137,6 @@ exports.purge = function()
         throw 'Purge is only available on test environment';
 
     executeQuery('delete from group_keys', []);
-    executeQuery('delete from commands', []);
+    executeQuery('delete from events', []);
+    executeQuery('delete from snapshots', []);
 };

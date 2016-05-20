@@ -20,13 +20,6 @@ var db = require('../server/db.js');
 var actions = require('./actions.js');
 var should = require('chai').should();
 
-var event =
-{
-    'id': '123',
-    'command': 'ToggleRepetition',
-    'data': { 'timestamp': 1000000}
-};
-
 beforeEach(function() {
     db.purge();
 });
@@ -132,100 +125,6 @@ describe('Authentication', function()
             });
 
             setTimeout(flood, 10);
-        }
-    });
-});
-
-describe('Live broadcast', function()
-{
-    it('should reach other clients in the group', function(done)
-    {
-        var socket1 = actions.connectAndRegister();
-        socket1.on('authOK', function(data)
-        {
-            connectAnother();
-        });
-
-        socket1.on('execute', function(data)
-        {
-            data.command.should.equal(event.command);
-            data.data.timestamp.should.equal(event.data.timestamp);
-            socket1.disconnect();
-            done();
-        });
-
-        function connectAnother()
-        {
-            var socket2 = actions.connectAndAuth(socket1.groupKey);
-            socket2.on('authOK', function(data)
-            {
-                socket2.emit('post', event);
-                socket2.disconnect();
-            });
-        }
-    });
-
-    it('should not reach clients outside of the group', function(done)
-    {
-        var socket1 = actions.connectAndRegister();
-        socket1.on('authOK', function(data)
-        {
-            createAnotherClient();
-            setTimeout(function() {
-                socket1.disconnect();
-                done();
-            }, 250); // wait to receive message
-        });
-
-        socket1.on('execute', function(data)
-        {
-            throw 'Should not receive execute event';
-        });
-
-        function createAnotherClient()
-        {
-            var socket2 = actions.connectAndRegister();
-            socket2.on('authOK', function(data)
-            {
-                socket2.emit('post', event);
-                socket2.disconnect();
-            });
-        }
-    });
-});
-
-describe('Delayed broadcast', function()
-{
-    it('should reach other client as they become online', function(done)
-    {
-        var since = null;
-        var socket1 = actions.connectAndRegister();
-        socket1.on('authOK', function()
-        {
-            socket1.emit('post', event);
-        });
-
-        socket1.on('execute', function(data)
-        {
-            since = data['timestamp'];
-            socket1.disconnect();
-            createAnotherClient();
-        });
-
-        function createAnotherClient()
-        {
-            var socket2 = actions.connectAndAuth(socket1.groupKey);
-            socket2.on('authOK', function ()
-            {
-                socket2.emit('fetch', {'since': since});
-            });
-
-            socket2.on('execute', function(data)
-            {
-                data.command.should.equal(event.command);
-                socket2.disconnect();
-                done();
-            });
         }
     });
 });

@@ -32,7 +32,7 @@ exports.auth =
     'required': ['groupKey', 'clientId']
 };
 
-exports.post =
+exports.postEvent =
 {
     'type': 'object',
     'properties': {
@@ -43,12 +43,12 @@ exports.post =
             'type': 'object',
             'maxProperties': 100
         },
-        'command': {
+        'event': {
             'type': 'string',
             'maxLength': 100
         }
     },
-    'required': ['id', 'data', 'command']
+    'required': ['id', 'data', 'event']
 };
 
 exports.fetch =
@@ -60,4 +60,26 @@ exports.fetch =
         }
     },
     'required': ['since']
+};
+
+exports.postSnapshot =
+{
+    'type': 'object',
+    'properties': {
+        'id': {
+            'type': 'string'
+        },
+        'data': {
+            'type': 'object',
+            'maxProperties': 100
+        }
+    },
+    'required': ['id', 'data']
+};
+
+exports.getSnapshot =
+{
+    'type': 'object',
+    'properties': {
+    },
 };
