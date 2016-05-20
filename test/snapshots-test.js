@@ -16,13 +16,8 @@
  */
 
 process.env.LOOP_ENV = 'test';
-var db = require('../server/db.js');
 var actions = require('./actions.js');
 var should = require('chai').should();
-
-beforeEach(function() {
-    db.purge();
-});
 
 var event1 =
 {
@@ -75,20 +70,14 @@ describe('Snapshots', function()
             if(!snapshotPosted)
             {
                 data.id.should.equal(event1.id);
-                setTimeout(function()
-                {
-                    snapshotPosted = true;
-                    socket.emit('postSnapshot', snapshot);
-                }, 50);
+                snapshotPosted = true;
+                socket.emit('postSnapshot', snapshot);
             }
             else if(!fetchPosted)
             {
                 data.id.should.equal(event2.id);
-                setTimeout(function()
-                {
-                    fetchPosted = true;
-                    socket.emit('fetch', {'since': 0});
-                }, 50);
+                fetchPosted = true;
+                socket.emit('fetch', {'since': 0});
             }
             else
                 fetchedIds.push(data.id);
@@ -99,9 +88,7 @@ describe('Snapshots', function()
             if(!fetchPosted)
             {
                 data.id.should.equal(snapshot.id);
-                setTimeout(function () {
-                    socket.emit('postEvent', event2);
-                }, 50);
+                socket.emit('postEvent', event2);
             }
             else
                 fetchedIds.push(data.id);

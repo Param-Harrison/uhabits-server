@@ -15,22 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-var colors = require('colors');
+process.env.LOOP_ENV = 'test';
+var db = require('../server/db.js');
 
-exports.inbound = function(key, action, data)
-{
-    if(!data) data = "";
-    console.log(colors.blue("<-- %s %s %s"), key.substring(0, 4),
-        action, JSON.stringify(data));
-};
-
-exports.outbound = function(key, action, data)
-{
-    if(!data) data = "";
-    console.log("--> %s %s %s", key.substring(0, 4), action, JSON.stringify(data));
-};
-
-exports.event = function(key, msg)
-{
-    console.log(colors.grey("*** %s %s"), key.substring(0, 4), msg);
-};
+beforeEach(function(done) {
+    db.purge(done);
+});

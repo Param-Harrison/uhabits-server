@@ -15,6 +15,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+exports.register =
+{
+    'type': 'object',
+    'properties': {
+        'groupKey': {
+            'type': 'string',
+            'minLength': 32,
+            'maxLength': 32
+        }
+    },
+    'required': ['groupKey']
+};
+
 exports.auth =
 {
     'type': 'object',
@@ -51,17 +64,6 @@ exports.postEvent =
     'required': ['id', 'data', 'event']
 };
 
-exports.fetch =
-{
-    'type': 'object',
-    'properties': {
-        'since': {
-            'type': 'number'
-        }
-    },
-    'required': ['since']
-};
-
 exports.postSnapshot =
 {
     'type': 'object',
@@ -77,9 +79,13 @@ exports.postSnapshot =
     'required': ['id', 'data']
 };
 
-exports.getSnapshot =
+exports.fetch =
 {
     'type': 'object',
     'properties': {
+        'since': {
+            'type': 'number'
+        }
     },
+    'required': ['since']
 };

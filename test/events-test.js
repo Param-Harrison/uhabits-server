@@ -16,7 +16,6 @@
  */
 
 process.env.LOOP_ENV = 'test';
-var db = require('../server/db.js');
 var actions = require('./actions.js');
 var should = require('chai').should();
 
@@ -27,16 +26,12 @@ var event =
     'data': { 'timestamp': 1000000}
 };
 
-beforeEach(function() {
-    db.purge();
-});
-
 describe('Live events', function()
 {
     it('should reach other clients in the group', function(done)
     {
         var socket1 = actions.connectAndRegister();
-        socket1.on('authOK', function(data)
+        socket1.on('authOK', function()
         {
             connectAnother();
         });
@@ -52,7 +47,7 @@ describe('Live events', function()
         function connectAnother()
         {
             var socket2 = actions.connectAndAuth(socket1.groupKey);
-            socket2.on('authOK', function(data)
+            socket2.on('authOK', function()
             {
                 socket2.emit('postEvent', event);
                 socket2.disconnect();
@@ -63,7 +58,7 @@ describe('Live events', function()
     it('should not reach clients outside of the group', function(done)
     {
         var socket1 = actions.connectAndRegister();
-        socket1.on('authOK', function(data)
+        socket1.on('authOK', function()
         {
             createAnotherClient();
             setTimeout(function() {
@@ -72,15 +67,15 @@ describe('Live events', function()
             }, 250); // wait to receive message
         });
 
-        socket1.on('execute', function(data)
+        socket1.on('execute', function()
         {
-            throw 'Should not receive execute event';
+            done(new Error('Should not receive execute event'));
         });
 
         function createAnotherClient()
         {
             var socket2 = actions.connectAndRegister();
-            socket2.on('authOK', function(data)
+            socket2.on('authOK', function()
             {
                 socket2.emit('postEvent', event);
                 socket2.disconnect();

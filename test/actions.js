@@ -18,6 +18,7 @@
 process.env.LOOP_ENV = 'test';
 var config = require('../server/config.js');
 var https = require('https');
+var crypto = require('crypto');
 var io = require('socket.io-client');
 var serverURL = 'https://[::1]:' + config['serverPort'];
 https.globalAgent.options.rejectUnauthorized = false;
@@ -37,12 +38,15 @@ function connectAndRegister()
     var socket = connect();
     socket.on('connect', function()
     {
-        socket.emit('register');
+        crypto.randomBytes(24, function(ex, buf)
+        {
+            socket.groupKey = buf.toString('base64');
+            socket.emit('register', {'groupKey': socket.groupKey});
+        });
     });
 
     socket.on('registerOK', function(data)
     {
-        socket.groupKey = data['groupKey'];
         socket.emit('auth', {
             'groupKey': socket.groupKey,
             'clientId': (nextClientId++).toString()

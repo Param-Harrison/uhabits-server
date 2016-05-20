@@ -16,13 +16,8 @@
  */
 
 process.env.LOOP_ENV = 'test';
-var db = require('../server/db.js');
 var actions = require('./actions.js');
 var should = require('chai').should();
-
-beforeEach(function() {
-    db.purge();
-});
 
 describe('Authentication', function()
 {
@@ -33,6 +28,29 @@ describe('Authentication', function()
         {
             socket.disconnect();
             done();
+        });
+    });
+
+    it('should not allow duplicate registration', function(done)
+    {
+        var socket1 = actions.connectAndRegister();
+        socket1.on('authOK', function(data)
+        {
+            var socket2 = actions.connect();
+            socket2.emit('register', {'groupKey': socket1.groupKey });
+
+            socket2.on('registerOK', function()
+            {
+                done(new Error('Should not accept registration'));
+            });
+
+            socket2.on('err', function(data)
+            {
+                data.code.should.equal(409);
+                socket2.disconnect();
+                socket1.disconnect();
+                done();
+            });
         });
     });
 

@@ -28,7 +28,7 @@ var config =
         'authTimeout': 5000,
         'rateLimitWindow': 600000,
         'rateLimitQuota': 600,
-        "maxConnectionsPerKey": 10
+        "maxConnectionsPerGroupKey": 10
     },
 
     'test': {
@@ -42,7 +42,7 @@ var config =
         'authTimeout': 100,
         'rateLimitWindow': 60000,
         'rateLimitQuota': 10,
-        "maxConnectionsPerKey": 10
+        "maxConnectionsPerGroupKey": 10
     }
 };
 
